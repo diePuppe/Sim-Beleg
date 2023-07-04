@@ -1,117 +1,163 @@
 import tkinter as tk
+from tkinter import ttk
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import simpy
 import random
-import numpy as np
+import threading
+
+# Globale Variable für den aktuellen Simulations-Thread
+current_simulation_thread = None
+
+root = tk.Tk()
+summer = tk.BooleanVar(value=False)  # !!!!!STELLSCHRAUBE!!!!!: Anpassbarer Parameter für Sommer/Winter
+semester_ferien = tk.BooleanVar(value=False)
+selected_beer = tk.StringVar(value="Becks")  # !!!!!STELLSCHRAUBE!!!!!: Anpassbarer Parameter für Biersorte
+
+
+class Customer:
+    def __init__(self, env, store, customer_type):
+        self.env = env
+        self.store = store
+        self.customer_type = customer_type
+
+    def buy_beer(self):
+        if self.customer_type == 'Student':
+            if semester_ferien.get():
+                if random.random() <= 0.05:  # Nur 5% der Studenten kaufen während der Semesterferien ein
+                    amount = random.randint(2, 20)
+                else:
+                    return 0  # Rückgabe von 0 für Studenten, die nicht während der Semesterferien einkaufen
+            else:
+                amount = random.randint(2, 10)  # Students buy 2 times more beer
+        else:
+            amount = random.randint(1, 3)  # Regular customers buy regular amount of beer
+        
+        beer_multiplier = 1.0
+        if selected_beer.get() == "Landskron":
+            beer_multiplier = 2.5  # Verkauf erhöht sich um 150%
+        elif selected_beer.get() == "Hasseröder":
+            beer_multiplier = 0.5  # Verkauf sinkt um 50%
+        elif selected_beer.get() == "Feldschlößchen":
+            beer_multiplier = 1.5  # Verkauf steigt um 50%
+        elif selected_beer.get() == "Helles":
+            beer_multiplier = 2.0  # Verkauf steigt um 100%
+
+        if summer.get():
+            beer_multiplier *= 2  # Double the amount of beer sold in summer
+
+        amount = int(amount * beer_multiplier)
+        
+        yield from self.store.buy_beer(amount)
+        return amount  # This line is added to return the 'amount'
+
 
 class BeerStore:
-    def __init__(self, env, text_area):
+    def __init__(self, env, fig, canvas):
         self.env = env
-        self.store = simpy.Container(env, init=3610, capacity=10000)  # Anzahl der Bierflaschen im Laden am Anfang und wie viele am Ende maximal im Laden sein können
-        self.text_area = text_area
-        self.customers = 0
+        self.store = simpy.Container(env, init=10000, capacity=10000)
         self.total_beer_sold = 0
+        self.student_beer_sales = [0] * 30
+        self.daily_beer_sales = [0] * 30
+        self.daily_customers = [0] * 30
+        self.fig = fig
+        self.canvas = canvas
+        self.ax = self.fig.add_subplot(131)  # Beer sales axis
+        self.ax2 = self.fig.add_subplot(132)  # Customers count axis
+        self.ax3 = self.fig.add_subplot(133)  # Student beer sales axis
 
     def buy_beer(self, amount):
         self.total_beer_sold += amount
         yield self.store.get(amount)
-        self.customers -= 1
-        self.update_ui()
+        self.daily_beer_sales[int(self.env.now) % 30] += amount
+        self.update_graph()
 
-    def add_customer(self):
-        self.customers += 1
-        self.update_ui()
+    def student_buy_beer(self, amount):
+        self.student_beer_sales[int(self.env.now) % 30] += amount
 
-    def update_ui(self):
-        self.text_area.delete('1.0', tk.END)
-        self.text_area.insert(tk.END, f'Time: {self.env.now}\n')
-        self.text_area.insert(tk.END, f'Customers: {self.customers}\n')
-        self.text_area.insert(tk.END, f'Total beer sold: {self.total_beer_sold}\n')
-        self.text_area.insert(tk.END, f'Beer remaining: {self.store.level}\n')
+    def update_graph(self):
+        self.ax.clear()
+        self.ax.bar(range(len(self.daily_beer_sales)), self.daily_beer_sales, align='center', alpha=0.5)
+        self.ax.set_xlabel('Tag im Monat')
+        self.ax.set_ylabel('Verkaufte Bierflaschen')
 
-def customer(env, store, temp):
-    while True:
-        store.add_customer()
-        if temp < 15:                       # Kunden kaufen mehr Bier wenn es warm ist
-            amount = random.randint(1, 3)
-        elif temp < 25 & temp > 15:
-            amount = random.randint(2, 6)
-        else:
-            amount = random.randint(4, 10) 
-        
-        # Kunde kommt in den Laden
-        arrive_rate = customer_arrival_rate(env.now)
-        arrive = random.expovariate(arrive_rate)
-        yield env.timeout(arrive) #zieht die Zeit ab
+        self.ax2.clear()
+        self.ax2.bar(range(len(self.daily_customers)), self.daily_customers, align='center', alpha=0.5)
+        self.ax2.set_xlabel('Tag im Monat')
+        self.ax2.set_ylabel('Anzahl der Kunden')
 
-        # Kunde kauft Bier
-        yield env.process(store.buy_beer(amount))
+        self.ax3.clear()
+        self.ax3.bar(range(len(self.student_beer_sales)), self.student_beer_sales, align='center', alpha=0.5)
+        self.ax3.set_xlabel('Tag im Monat')
+        self.ax3.set_ylabel('Verkaufte Bierflaschen (Studenten)')
 
-def restock(env, store):
-    while True:
-        yield env.timeout(10)  # Prüfen Sie alle 10 Zeiteinheiten
+        self.canvas.draw()
 
-        if store.store.level < random.randint(50,2000):  # Simulation wann auffält das zu wenig Bier da ist bzw Standartbestellungen
-            restore = random.randint(20, 3610) #Anzahl von einer Palette Bier
-            yield store.store.put(restore)  # Bier nachfüllen
-        store.update_ui()
+    def add_customer(self, customer_type):
+        self.daily_customers[int(self.env.now) % 30] += 1
+        return Customer(self.env, self, customer_type)
 
-def customer_arrival_rate(t):
+    def run_simulation(self):
+        for _ in range(30):
+            num_customers = random.randint(10, 500)  # Random number of customers
+            for _ in range(num_customers):
+                customer_type = random.choice(['Regular', 'Student'])
+                customer = self.add_customer(customer_type)
+                amount = yield from customer.buy_beer()  # This is changed
+                if customer_type == 'Student' and amount > 0:  # Nur wenn der Student tatsächlich Bier kauft
+                    self.student_buy_beer(amount)
+            yield self.env.timeout(1)  # A day passes
 
-    # Diese Funktion gibt die Kundenankunftsrate zu einer bestimmten Zeit t zurück
-    # Es ist so gestaltet, dass die Rate zwischen 7 und 11 Uhr niedrig ist, 
-    # zwischen 11 und 18 Uhr hoch und danach wieder niedrig bis 22 Uhr
 
-    # Konvertiert die Simulationszeit in "Echtzeit"
-    real_time = (t % 1440) / 1440.0 * 24.0 
-
-    # Normalverteilungsparameter
-    mean_morning = 9.0
-    std_dev_morning = 1.0
-    mean_afternoon = 14.5
-    std_dev_afternoon = 2.5
-    mean_evening = 20.0
-    std_dev_evening = 2.0
-
-    # Die Kundenankunftsrate ist proportional zur Wahrscheinlichkeitsdichtefunktion der Normalverteilung
-    morning = np.exp(-(real_time - mean_morning)**2 / (2 * std_dev_morning**2))
-    afternoon = np.exp(-(real_time - mean_afternoon)**2 / (2 * std_dev_afternoon**2))
-    evening = np.exp(-(real_time - mean_evening)**2 / (2 * std_dev_evening**2))
-
-    # Kombiniert die Raten von morgens, nachmittags und abends
-    rate = morning + afternoon + evening
-
-    # Normiert die Rate, sodass sie nie kleiner als 0.1 ist (um zu vermeiden, dass es zu Zeiten mit sehr wenigen Kundenankünften zu lange dauert)
-    rate = max(rate, 0.1)
-
-    return rate
-
-def main(text_area):
-    
-    text_area.delete('1.0', tk.END)
-
+def simulation_thread(fig, canvas):
     env = simpy.Environment()
-    store = BeerStore(env, text_area)
-    temp = random.randint(5,36) # Temperatur wird zufällig generiert
-    students= random.randint(1,301) # 171 Tage sind Studenten in der Uni.
+    store = BeerStore(env, fig, canvas)
+    env.process(store.run_simulation())
+    env.run()
 
-    
 
-    # Erzeugen von Kunden
-    for i in range(20):
-        env.process(customer(env, store, temp))
+def main(fig, canvas):
+    global current_simulation_thread
 
-    # Bier nachfüllen
-    env.process(restock(env, store))
+    if current_simulation_thread is not None and current_simulation_thread.is_alive():
+        current_simulation_thread.join()
 
-    # Simulation starten
-    env.run(until=1440)
+    current_simulation_thread = threading.Thread(target=simulation_thread, args=(fig, canvas))
+    current_simulation_thread.start()
 
-root = tk.Tk()
-text_area = tk.Text(root)
-text_area.pack()
 
-# Erstellen Sie eine Schaltfläche und binden Sie sie an die Funktion main
-start_button = tk.Button(root, text="Neustart", command=lambda: main(text_area))
+fig = Figure(figsize=(15, 5), dpi=100)  # Changed figure size to better accommodate three subplots in a row
+canvas = FigureCanvasTkAgg(fig, master=root)
+canvas.get_tk_widget().pack()
+
+start_button = tk.Button(root, text="Neustart", command=lambda: main(fig, canvas))
 start_button.pack()
+
+# Dropdown-Liste für Sommer/Winter
+season_label = tk.Label(root, text="Saison:")
+season_label.pack()
+season_combobox = ttk.Combobox(root, values=["Sommer", "Winter"], state="readonly")
+season_combobox.current(0)  # Set default value to "Sommer"
+season_combobox.pack()
+summer.set(True)  # Set summer as default season
+
+def season_changed(event):
+    if season_combobox.get() == "Sommer":
+        summer.set(True)
+    else:
+        summer.set(False)
+
+season_combobox.bind("<<ComboboxSelected>>", season_changed)
+
+# Checkbox für Semesterferien
+semester_ferien_checkbutton = tk.Checkbutton(root, text="Semesterferien", variable=semester_ferien)
+semester_ferien_checkbutton.pack()
+
+# Dropdown-Liste für Biersorten
+beer_label = tk.Label(root, text="Biersorte:")
+beer_label.pack()
+beer_combobox = ttk.Combobox(root, values=["Becks", "Landskron", "Hasseröder", "Feldschlößchen", "Helles"], state="readonly", textvariable=selected_beer)
+beer_combobox.current(0)  # Set default value to "Becks"
+beer_combobox.pack()
 
 root.mainloop()
