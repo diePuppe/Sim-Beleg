@@ -1,0 +1,51 @@
+= Getränkeladen Simulation
+:toc: macro
+:toc-title:
+:toclevels: 2
+
+== Überblick
+Dieser Python-Code ist eine Simulation eines Bierladens, der eine Graphik des Verkaufsverhaltens anzeigt. Der Laden hat zwei Arten von Kunden: "normale" Kunden und Studenten. Ihre Kaufgewohnheiten variieren je nach Jahreszeit und ob es Semesterferien sind oder nicht.
+
+== Code Detail
+
+=== Importierte Module
+Der Code verwendet mehrere externe Module:
+
+* `tkinter` und `ttk` - für die Benutzeroberfläche.
+* `matplotlib` - für die Erstellung der Diagramme.
+* `simpy` - für die Event-basierte Simulation.
+* `random` - für das Erzeugen von Zufallszahlen.
+* `threading` - um die Simulation in einem separaten Thread auszuführen, um die GUI reaktionsfähig zu halten.
+
+=== Globale Variablen und Initialisierung
+Es gibt einige globale Variablen und Initialisierungen zu Beginn des Codes:
+
+* `root` - Die Haupt-GUI-Instanz von tkinter.
+* `summer`, `semester_ferien`, `selected_beer` - Variablen, die den aktuellen Zustand der Simulation darstellen.
+* `current_simulation_thread` - Variable, um den laufenden Simulations-Thread zu speichern.
+* `fig` und `canvas` - Matplotlib-Figur und Leinwand zur Anzeige von Diagrammen.
+
+=== Klassen: `Customer` und `BeerStore`
+Zwei Klassen werden definiert: `Customer` und `BeerStore`. 
+
+Die `Customer`-Klasse repräsentiert einen Kunden, der eine bestimmte Menge Bier kauft, abhängig vom Kundentyp (Student oder normal), der Jahreszeit und den Semesterferien.
+
+Die `BeerStore`-Klasse repräsentiert den Bierladen. Sie verwaltet einen Container, der den Bierbestand darstellt, sowie eine Liste von täglichen Verkaufszahlen und Kunden. Sie stellt Methoden zur Verfügung, um Bier zu kaufen, Diagramme zu aktualisieren und die Simulation auszuführen.
+
+=== Hauptfunktionen: `simulation_thread` und `main`
+Die `simulation_thread`-Funktion führt die eigentliche Simulation durch. Sie erzeugt eine neue Umgebung und einen neuen Bierladen und führt dann die Simulation aus.
+
+Die `main`-Funktion startet den Simulations-Thread. Wenn bereits ein Thread läuft, wartet sie, bis er beendet ist, bevor sie einen neuen startet.
+
+=== GUI-Konfiguration
+Es werden verschiedene GUI-Elemente erstellt:
+
+* Ein Button, um die Simulation zu starten.
+* Eine Dropdown-Liste zur Auswahl der Saison.
+* Eine Checkbox zur Auswahl der Semesterferien.
+* Eine Dropdown-Liste zur Auswahl der Biersorte.
+
+Nach der Konfiguration dieser Elemente wird die Haupt-GUI-Schleife gestartet.
+
+== Verwendung
+Um den Code zu verwenden, führen Sie ihn einfach in einer Python-Umgebung aus. Sie können die Saison, ob Semesterferien sind oder nicht, und die Biersorte auswählen und dann die Simulation starten. Die Diagramme werden automatisch aktualisiert, um den täglichen Verkauf von Bier und die Anzahl der Kunden zu zeigen.
