@@ -3,6 +3,10 @@
 :toc-title:
 :toclevels: 2
 
+== Installation
+
+pip install -r requirements.txt
+
 == Überblick
 Dieser Python-Code ist eine Simulation eines Bierladens, der eine Graphik des Verkaufsverhaltens anzeigt. Der Laden hat zwei Arten von Kunden: "normale" Kunden und Studenten. Ihre Kaufgewohnheiten variieren je nach Jahreszeit und ob es Semesterferien sind oder nicht.
 
