@@ -24,14 +24,14 @@ class Customer:
     def buy_beer(self):
         if self.customer_type == 'Student':
             if semester_ferien.get():
-                if random.random() <= 0.05:  # Stellschraube: Wie viele Studenten kaufen während der Semesterferien ein
-                    amount = random.randint(2, 20)  # Studenten kaufen während der Semesterferien mehr
+                if random.random() <= 0.25:  # Stellschraube: Wie viele Studenten kaufen während der Semesterferien ein
+                    amount = random.randint(10, 20)  # Studenten kaufen während der Semesterferien mehr
                 else:
                     return 0
             else:
-                amount = random.randint(2, 5)  # Students kaufen 2-5 Bier während der Vorlesung  # Stellschraube
+                amount = random.randint(5, 10)  # Students kaufen 2-5 Bier während der Vorlesung  # Stellschraube
         else:
-            amount = random.randint(1, 3)  # Normale Menschen kaufen 1-3 Bier
+            amount = random.randint(1, 20)  # Normale Menschen kaufen 1-20 Bier
 
         beer_multiplier = 1.0
         if selected_beer.get() == "Landskron":
@@ -63,8 +63,8 @@ class BeerStore:
         self.fig = fig
         self.canvas = canvas
         self.ax = self.fig.add_subplot(131)  # Bierverkauf Diagramm
-        self.ax2 = self.fig.add_subplot(132)  # Kunden Diagramm
-        self.ax3 = self.fig.add_subplot(133)  # Verkauf an Studenten Diagramm
+        self.ax3 = self.fig.add_subplot(132)  # Kunden Diagramm
+        self.ax2 = self.fig.add_subplot(133)  # Verkauf an Studenten Diagramm
 
     def buy_beer(self, amount):
         self.total_beer_sold += amount
@@ -99,7 +99,7 @@ class BeerStore:
 
     def run_simulation(self):
         for _ in range(31):
-            num_customers = random.randint(10, 500)  # Anzahl der Kunden
+            num_customers = random.randint(10, 20)  # Anzahl der Kunden
             for _ in range(num_customers):
                 customer_type = random.choice(['Regular', 'Student'])  # Hier könnte man noch angeben, in welchem Verhältnis Studenten und Kunden kommen
                 customer = self.add_customer(customer_type)
@@ -130,7 +130,7 @@ fig = Figure(figsize=(15, 5), dpi=100)  # Größe ändern, um Diagramme besser z
 canvas = FigureCanvasTkAgg(fig, master=root)
 canvas.get_tk_widget().pack()
 
-start_button = tk.Button(root, text="Neustart", command=lambda: main(fig, canvas))
+start_button = tk.Button(root, text="Start", command=lambda: main(fig, canvas))
 start_button.pack()
 
 # Dropdown-Liste für Sommer/Winter
@@ -154,7 +154,7 @@ semester_ferien_checkbutton = tk.Checkbutton(root, text="Semesterferien", variab
 semester_ferien_checkbutton.pack()
 
 # Dropdown-Liste für Biersorten
-beer_label = tk.Label(root, text="Biersorte:")
+beer_label = tk.Label(root, text="Biersorte im Angebot:")
 beer_label.pack()
 beer_combobox = ttk.Combobox(root, values=["Becks", "Landskron", "Hasseröder", "FeldSchlößchen", "Helles"], state="readonly", textvariable=selected_beer)
 beer_combobox.current(0)  # Standardwert ist "Becks"
